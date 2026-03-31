@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-from model_utils import train_all_models  # Importing from your existing script
+from model_utils import train_all_models  
 
 # Configure page settings
 st.set_page_config(page_title="Lipid Productivity Predictor", page_icon="🧪", layout="wide")
@@ -33,7 +33,22 @@ with st.expander("🔍 View Raw Dataset", expanded=False):
 
 st.sidebar.markdown("---")
 st.sidebar.header("2. Model Configuration")
-target_col = st.sidebar.text_input("Target Column Name", "OUTCOME High/Low LC, LP, BP")
+
+# --- NEW FEATURE: DYNAMIC DROPDOWN FOR TARGET COLUMN ---
+# We try to set your specific algae column as the default if it exists in the uploaded CSV
+default_col_index = 0
+preferred_target = "OUTCOME High/Low LC, LP, BP"
+
+if preferred_target in df.columns:
+    default_col_index = list(df.columns).index(preferred_target)
+
+target_col = st.sidebar.selectbox(
+    "Select Target Column", 
+    options=df.columns, 
+    index=default_col_index,
+    help="Choose the column you want the machine learning models to predict."
+)
+# -------------------------------------------------------
 
 available_models = ["Random Forest", "SVM", "Logistic Regression", "KNN", "XGBoost", "ANN"]
 selected_models = st.sidebar.multiselect(
@@ -46,11 +61,8 @@ selected_models = st.sidebar.multiselect(
 if st.sidebar.button("🚀 Train Models & Compare", type="primary"):
     if not selected_models:
         st.warning("Please select at least one model to train.")
-    elif target_col not in df.columns:
-        st.error(f"Target column '{target_col}' not found in the dataset! Please check the spelling.")
     else:
         with st.spinner("Training models... This might take a few seconds."):
-            # Call your backend logic
             try:
                 output_data = train_all_models(df, target=target_col, selected_models=selected_models)
                 st.toast("Training Complete!", icon="✅")
@@ -63,7 +75,6 @@ if st.sidebar.button("🚀 Train Models & Compare", type="primary"):
                     st.subheader("Performance Metrics")
                     results_df = pd.DataFrame(output_data["results"])
                     
-                    # Highlight highest values
                     st.dataframe(
                         results_df.style.highlight_max(axis=0, subset=['accuracy', 'f1_score'], color='lightgreen'),
                         use_container_width=True
@@ -94,16 +105,14 @@ if st.sidebar.button("🚀 Train Models & Compare", type="primary"):
                     feature_names = output_data["feature_names"]
                     
                     importances = None
-                    # Tree based models
                     if hasattr(best_model_obj, "feature_importances_"):
                         importances = best_model_obj.feature_importances_
-                    # Linear models
                     elif hasattr(best_model_obj, "coef_"):
                         importances = np.abs(best_model_obj.coef_[0])
                     
                     if importances is not None:
                         st.markdown("### Top 15 Most Important Variables")
-                        st.caption("These are the inputs that have the strongest influence on predicting High vs Low Lipid Productivity.")
+                        st.caption("These are the inputs that have the strongest influence on predicting your target variable.")
                         
                         feat_df = pd.DataFrame({
                             "Feature": feature_names,
@@ -114,11 +123,12 @@ if st.sidebar.button("🚀 Train Models & Compare", type="primary"):
                             feat_df, x="Importance", y="Feature", orientation='h',
                             color="Importance", color_continuous_scale="Viridis"
                         )
+                        # Applied the height fix here to prevent scrolling issues!
                         fig_feat.update_layout(
                             yaxis={'categoryorder':'total ascending'},
                             height=550,
                             margin=dict(t=30, b=0, l=0, r=0)
-                            )
+                        )
                         st.plotly_chart(fig_feat, use_container_width=True)
                     else:
                         st.info(f"Feature importance visualization is not natively supported for {best_model_name} (e.g., KNN/ANN). Train Random Forest or XGBoost to view feature weights.")
@@ -128,7 +138,6 @@ if st.sidebar.button("🚀 Train Models & Compare", type="primary"):
                     st.subheader("Test Data Predictions")
                     st.write("Compare the actual ground-truth values against what the best model predicted.")
                     
-                    # Format test predictions nicely
                     y_true = output_data["y_test"]
                     best_preds = output_data["predictions"][best_model_name]
                     
@@ -140,7 +149,6 @@ if st.sidebar.button("🚀 Train Models & Compare", type="primary"):
                     
                     st.dataframe(pred_df)
                     
-                    # Allow user to download results
                     csv = pred_df.to_csv(index=False).encode('utf-8')
                     st.download_button("Download Prediction Results (CSV)", data=csv, file_name="predictions.csv", mime="text/csv")
             

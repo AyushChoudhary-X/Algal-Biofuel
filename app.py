@@ -68,9 +68,10 @@ if st.session_state.is_trained:
     best_model_name = output_data["best_model"]
     best_model_obj = output_data["models"][best_model_name]
     
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Model Comparison", 
         "🔍 Feature Importance", 
+        "🧠 SHAP Analysis",
         "📂 Prediction Results", 
         "🧪 What-If Predictor"
     ])
@@ -108,8 +109,47 @@ if st.session_state.is_trained:
         else:
             st.info("Feature importance not supported for this model type.")
 
-    # --- TAB 3: PREDICTION EXPLORER ---
+    # --- TAB 3: SHAP ANALYSIS (ADVANCED EXPLAINABILITY) ---
     with tab3:
+        st.subheader("🧠 Advanced AI Explainability (SHAP)")
+        st.write("While standard Feature Importance tells us *which* variables matter, SHAP tells us *how* they matter.")
+        
+        if best_model_name in ["Random Forest", "XGBoost"]:
+            with st.spinner("Calculating SHAP values..."):
+                import shap
+                import matplotlib.pyplot as plt
+                
+                # Get raw data and scale it so the model can read it
+                X_raw = output_data["X"]
+                scaler = output_data["scaler"]
+                X_scaled = scaler.transform(X_raw)
+                
+                # Calculate SHAP values using TreeExplainer
+                explainer = shap.TreeExplainer(best_model_obj)
+                shap_values = explainer.shap_values(X_scaled)
+                
+                # RF returns a list of arrays (one for each class), XGBoost returns one array
+                if isinstance(shap_values, list):
+                    shap_to_plot = shap_values[1]  # Index 1 is the positive class (HLP)
+                else:
+                    shap_to_plot = shap_values
+                
+                # Generate Plotly-friendly matplotlib chart
+                fig, ax = plt.subplots(figsize=(10, 6))
+                shap.summary_plot(shap_to_plot, X_raw, show=False)
+                st.pyplot(fig)
+                
+                st.info("""
+                **📖 How to read this chart:**
+                * **X-axis (Impact):** Dots pushed to the right mean those specific conditions drove the prediction toward **High Lipid Productivity (HLP)**. Dots to the left drove it toward **Low (LLP)**.
+                * **Color (Value):** Red dots represent high actual values for that feature. Blue dots represent low values. 
+                * *Example:* If 'Temperature' has a cluster of red dots on the far left, it means high temperatures are actively destroying lipid productivity!
+                """)
+        else:
+            st.warning("⚠️ SHAP visualizer in this app is currently optimized for Tree-based models. Please ensure **Random Forest** or **XGBoost** is your top-performing model to view this tab.")
+
+    # --- TAB 4: PREDICTION EXPLORER ---
+    with tab4:
         st.subheader("Test Data Predictions")
         y_true = output_data["y_test"]
         best_preds = output_data["predictions"][best_model_name]
@@ -117,8 +157,8 @@ if st.session_state.is_trained:
         pred_df["Correct Prediction?"] = pred_df["Actual Target"] == pred_df[f"Predicted ({best_model_name})"]
         st.dataframe(pred_df)
 
-    # --- TAB 4: WHAT-IF PREDICTOR (SCENARIO TESTING) ---
-    with tab4:
+    # --- TAB 5: WHAT-IF PREDICTOR (SCENARIO TESTING) ---
+    with tab5:
         st.subheader("🧪 Interactive Scenario Testing")
         st.markdown(f"Adjust the parameters below. The app will use the **{best_model_name}** model to predict the outcome.")
         
@@ -126,10 +166,8 @@ if st.session_state.is_trained:
         baseline_row = X_baseline.iloc[0].to_dict()
         user_inputs = {}
         
-        # Wrap everything in a form so it doesn't refresh until submitted!
         with st.form("what_if_form"):
             input_cols = st.columns(3)
-            
             for i, (col_name, default_val) in enumerate(baseline_row.items()):
                 with input_cols[i % 3]:
                     if pd.api.types.is_numeric_dtype(df[col_name]):
@@ -143,10 +181,8 @@ if st.session_state.is_trained:
                         user_inputs[col_name] = st.selectbox(col_name, options=unique_vals, index=unique_vals.index(safe_default))
             
             st.markdown("---")
-            # The form submit button
             submitted = st.form_submit_button("🔮 Predict Outcome for this Scenario", type="primary", use_container_width=True)
             
-        # Run prediction ONLY when the form is submitted
         if submitted:
             user_df = pd.DataFrame([user_inputs])
             combined = pd.concat([X_baseline, user_df], ignore_index=True)

@@ -45,7 +45,8 @@ if preferred_target in df.columns:
 
 target_col = st.sidebar.selectbox("Select Target Column", options=df.columns, index=default_col_index)
 
-available_models = ["Random Forest", "SVM", "Logistic Regression", "KNN", "XGBoost", "ANN"]
+available_models = ["Voting Ensemble (Super Model)", "Random Forest", "SVM", "Logistic Regression", "KNN", "XGBoost", "ANN"]
+selected_models = st.sidebar.multiselect("Select Models to Train", available_models, default=["Voting Ensemble (Super Model)", "Random Forest", "XGBoost"])
 selected_models = st.sidebar.multiselect("Select Models to Train", available_models, default=["Random Forest", "Logistic Regression", "XGBoost"])
 
 # ================= TRAINING TRIGGER =================

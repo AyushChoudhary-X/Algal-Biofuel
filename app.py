@@ -47,7 +47,6 @@ target_col = st.sidebar.selectbox("Select Target Column", options=df.columns, in
 
 available_models = ["Voting Ensemble (Super Model)", "Random Forest", "SVM", "Logistic Regression", "KNN", "XGBoost", "ANN"]
 selected_models = st.sidebar.multiselect("Select Models to Train", available_models, default=["Voting Ensemble (Super Model)", "Random Forest", "XGBoost"])
-selected_models = st.sidebar.multiselect("Select Models to Train", available_models, default=["Random Forest", "Logistic Regression", "XGBoost"])
 
 # ================= TRAINING TRIGGER =================
 if st.sidebar.button("🚀 Train Models & Compare", type="primary"):

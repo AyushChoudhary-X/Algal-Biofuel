@@ -114,7 +114,11 @@ if st.sidebar.button("🚀 Train Models & Compare", type="primary"):
                             feat_df, x="Importance", y="Feature", orientation='h',
                             color="Importance", color_continuous_scale="Viridis"
                         )
-                        fig_feat.update_layout(yaxis={'categoryorder':'total ascending'})
+                        fig_feat.update_layout(
+                            yaxis={'categoryorder':'total ascending'},
+                            height=550,
+                            margin=dict(t=30, b=0, l=0, r=0)
+                            )
                         st.plotly_chart(fig_feat, use_container_width=True)
                     else:
                         st.info(f"Feature importance visualization is not natively supported for {best_model_name} (e.g., KNN/ANN). Train Random Forest or XGBoost to view feature weights.")

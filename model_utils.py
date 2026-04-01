@@ -1,4 +1,4 @@
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
@@ -28,21 +28,21 @@ def train_all_models(df, target, selected_models):
     num_cols = X_full.select_dtypes(include=np.number).columns
     cat_cols = X_full.select_dtypes(exclude=np.number).columns
 
-    X_full[num_cols] = X_full[num_cols].fillna(X_full[num_cols].median()) # Switched to Median for robustness
+    X_full[num_cols] = X_full[num_cols].fillna(X_full[num_cols].mean())
     X_full[cat_cols] = X_full[cat_cols].fillna('Unknown')
 
     X_encoded = pd.get_dummies(X_full, columns=cat_cols, drop_first=True)
 
-    # 4. VARIANCE FILTER (UPGRADE: Lowered threshold to keep rare predictive signals)
-    selector = VarianceThreshold(threshold=0.0) 
+    # 4. VARIANCE FILTER
+    selector = VarianceThreshold(threshold=0.01)
     X_var = selector.fit_transform(X_encoded)
 
     selected_features = X_encoded.columns[selector.get_support()]
     X = pd.DataFrame(X_var, columns=selected_features)
 
-    # 5. SPLIT (UPGRADE: Added stratify=y to perfectly balance train/test HLP ratios)
+    # 5. SPLIT 
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y 
+        X, y, test_size=0.2, random_state=42
     )
 
     # 6. SCALING
@@ -50,37 +50,17 @@ def train_all_models(df, target, selected_models):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    # 7. CLASSIFICATION MODELS (UPGRADE: Tuned hyperparameters!)
-    xgb_tuned = XGBClassifier(
-        n_estimators=200, learning_rate=0.05, max_depth=6, 
-        subsample=0.8, colsample_bytree=0.8, 
-        use_label_encoder=False, eval_metric='logloss', random_state=42
-    )
-    
-    rf_tuned = RandomForestClassifier(
-        n_estimators=200, max_depth=None, min_samples_split=2, 
-        min_samples_leaf=1, class_weight="balanced", random_state=42
-    )
-    
-    svm_tuned = SVC(probability=True, kernel='rbf', C=1.0, random_state=42)
-
-    # UPGRADE: New Super Model!
-    voting_ensemble = VotingClassifier(
-        estimators=[('xgb', xgb_tuned), ('rf', rf_tuned), ('svm', svm_tuned)],
-        voting='soft'
-    )
-
+    # 7. CLASSIFICATION MODELS 
     all_models = {
-        "Random Forest": rf_tuned,
-        "SVM": svm_tuned,
-        "Logistic Regression": LogisticRegression(max_iter=2000, C=0.5, random_state=42),
-        "KNN": KNeighborsClassifier(n_neighbors=5, weights='distance'),
-        "XGBoost": xgb_tuned,
-        "ANN": MLPClassifier(hidden_layer_sizes=(100, 50), max_iter=1000, random_state=42),
-        "Voting Ensemble (Super Model)": voting_ensemble
+        "Random Forest": RandomForestClassifier(n_estimators=50, max_depth=20, min_samples_split=2, min_samples_leaf=2, random_state=42),
+        "SVM": SVC(probability=True, random_state=42),
+        "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
+        "KNN": KNeighborsClassifier(),
+        "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42),
+        "ANN": MLPClassifier(max_iter=500, random_state=42)
     }
 
-    models = {k: all_models[k] for k in selected_models if k in all_models}
+    models = {k: all_models[k] for k in selected_models}
 
     results = []
     trained_models = {}
@@ -113,7 +93,7 @@ def train_all_models(df, target, selected_models):
         "best_model": best_model,
         "scaler": scaler,
         "feature_names": list(X.columns),
-        "X": X,
+        "X": X ,# <-- Added this back so predict/optimize don't crash
         "y_test": y_test.reset_index(drop=True),
         "predictions": predictions
     }

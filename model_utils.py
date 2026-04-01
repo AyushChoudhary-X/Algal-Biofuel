@@ -93,7 +93,7 @@ def train_all_models(df, target, selected_models):
         "best_model": best_model,
         "scaler": scaler,
         "feature_names": list(X.columns),
-        "X": X ,# <-- Added this back so predict/optimize don't crash
+        "X": X, 
         "y_test": y_test.reset_index(drop=True),
         "predictions": predictions
     }
